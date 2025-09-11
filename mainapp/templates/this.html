@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Panorama Mapper — HTML (controls)</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;700&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#0f1724;--card:#0b1220;--muted:#94a3b8;--accent:#06b6d4;--white:#ffffff}
+    *{box-sizing:border-box}
+    body{font-family:Nunito,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;margin:0;background:linear-gradient(180deg,#071026 0%, #061427 100%);color:var(--white);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+    .app{width:100%;max-width:1100px}
+    header{display:flex;align-items:center;gap:16px;margin-bottom:12px}
+    h1{font-size:20px;margin:0}
+    .subtitle{color:var(--muted);font-size:13px}
+
+    .controls{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+    .btn{background:var(--card);border:1px solid rgba(255,255,255,0.06);padding:8px 10px;border-radius:8px;color:var(--white);cursor:pointer;font-size:14px}
+    .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06)}
+    .thumbs{display:flex;gap:8px}
+    .thumbs img{width:120px;height:70px;object-fit:cover;border-radius:6px;cursor:pointer;border:2px solid transparent}
+    .thumbs img.active{border-color:var(--accent)}
+
+    /* viewer */
+    .viewer{position:relative;width:100%;height:60vh;background:#000;border-radius:10px;overflow:hidden;box-shadow:0 6px 30px rgba(2,6,23,0.7)}
+    .panorama{position:absolute;top:0;left:0;height:100%;will-change:transform}
+    .panorama img{height:100%;display:block;user-select:none;pointer-events:none}
+
+    /* markers layer sits above the panorama and inside viewer */
+    .markers-layer{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
+    .marker{position:absolute;transform:translate(-50%,-100%);pointer-events:auto}
+    .marker .pin{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.95);border:2px solid #ff4d6d;box-shadow:0 4px 12px rgba(0,0,0,0.4);cursor:pointer}
+    .marker .pin svg{display:block}
+
+    .popup{position:absolute;transform:translate(-50%,6px);min-width:220px;background:linear-gradient(180deg,#ffffff,#f7fafc);color:#0b1220;border-radius:8px;padding:8px;font-size:13px;box-shadow:0 8px 30px rgba(2,6,23,0.6);z-index:50}
+    .popup input[type=text]{width:100%;padding:6px;border:1px solid #e6eef6;border-radius:6px;margin-bottom:6px}
+    .popup .linkimgs{display:flex;gap:6px}
+    .popup .linkimgs img{width:46px;height:30px;object-fit:cover;border-radius:4px;cursor:pointer;border:2px solid transparent}
+    .popup .linkimgs img.sel{border-color:var(--accent)}
+
+    .overlay-stats{position:absolute;left:12px;bottom:12px;background:rgba(3,7,18,0.6);padding:6px 8px;border-radius:6px;font-size:12px}
+    .bottom-panel{margin-top:12px;background:rgba(255,255,255,0.03);padding:10px;border-radius:8px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+
+    input[type=file]{display:none}
+    .small{font-size:13px}
+    .muted{color:var(--muted)}
+
+    /* left/right scroll buttons */
+    .nav-btn{position:absolute;top:50%;transform:translateY(-50%);width:48px;height:48px;border-radius:999px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,0.06);cursor:pointer;z-index:40}
+    .nav-btn:hover{background:rgba(255,255,255,0.12)}
+    .nav-left{left:12px}
+    .nav-right{right:12px}
+
+    @media (max-width:720px){.thumbs img{width:96px;height:60px}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div>
+        <h1>Panorama Mapper — HTML (controls)</h1>
+        <div class="subtitle">Drag or scroll horizontally to pan. Toggle "Add marker" then click to place markers. Use the left/right buttons to jump horizontally.</div>
+      </div>
+    </header>
+
+    <div class="controls">
+      <button id="toggleAdd" class="btn">Add Marker</button>
+      <button id="exportBtn" class="btn ghost">Export Markers</button>
+      <label class="btn ghost" for="importFile" style="cursor:pointer">Import Markers</label>
+      <input id="importFile" type="file" accept="application/json">
+      <button id="clearBtn" class="btn ghost">Clear Markers</button>
+
+      <div style="flex:1"></div>
+
+      <div class="thumbs" id="thumbs"></div>
+    </div>
+
+    <div id="viewer" class="viewer">
+      <div id="panorama" class="panorama"><img id="pimg" src="" alt="panorama"></div>
+      <!-- markers layer inside viewer ensures correct coordinates -->
+      <div id="markersLayer" class="markers-layer" aria-hidden="false"></div>
+      <div id="stats" class="overlay-stats">0%</div>
+
+      <!-- Navigation buttons -->
+      <button id="navLeft" class="nav-btn nav-left" title="Scroll left">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M15 6l-6 6 6 6"></path></svg>
+      </button>
+      <button id="navRight" class="nav-btn nav-right" title="Scroll right">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M9 6l6 6-6 6"></path></svg>
+      </button>
+    </div>
+
+    <div class="bottom-panel small">
+      <div class="muted">Click a thumbnail to switch panorama. Markers are saved in localStorage.</div>
+      <div style="flex:1"></div>
+      <div>Right now: <span id="curIdx">0</span> / <span id="total">0</span></div>
+    </div>
+
+  </div>
+
+  <script>
+  (function(){
+    // Image list (replace with your URLs)
+    const images = [
+      'https://res.cloudinary.com/dbrvducfo/image/upload/v1757265626/WhatsApp_Image_2025-09-06_at_4.58.54_PM_wigaev.png',
+      'https://res.cloudinary.com/dbrvducfo/image/upload/v1757265625/WhatsApp_Image_2025-09-06_at_4.58.54_PM_1_s3ugja.jpg',
+      'https://res.cloudinary.com/dbrvducfo/image/upload/v1757265625/WhatsApp_Image_2025-09-06_at_4.58.54_PM_2_smfy7g.jpg'
+    ];
+
+    const viewer = document.getElementById('viewer');
+    const panorama = document.getElementById('panorama');
+    const pimg = document.getElementById('pimg');
+    const stats = document.getElementById('stats');
+    const thumbs = document.getElementById('thumbs');
+    const curIdxEl = document.getElementById('curIdx');
+    const totalEl = document.getElementById('total');
+    const markersLayer = document.getElementById('markersLayer');
+
+    const navLeft = document.getElementById('navLeft');
+    const navRight = document.getElementById('navRight');
+
+    let currentIndex = 0;
+    let isDragging = false;
+    let lastX = 0;
+    let offset = 0; // px
+    let renderedWidth = 0;
+    let containerWidth = 0;
+
+    const storageKey = 'panorama-markers-html-v1';
+    let markers = loadMarkers(); // { index: [ {id,xPercent,yPercent,title,linkIndex} ] }
+
+    // Keep a map of marker id => element so we can update positions without recreating
+    const markerEls = new Map();
+
+    // UI elements
+    const toggleAddBtn = document.getElementById('toggleAdd');
+    const exportBtn = document.getElementById('exportBtn');
+    const importFile = document.getElementById('importFile');
+    const clearBtn = document.getElementById('clearBtn');
+
+    let addMode = false;
+    // continuous scroll interval holder
+    let scrollInterval = null;
+
+    // scroll step is a fraction of container width
+    function scrollStepPx(){ return Math.max(100, Math.round(containerWidth * 0.25)); }
+
+    function init(){
+      images.forEach((src,i)=>{
+        const img = document.createElement('img');
+        img.src = src;
+        img.alt = 'thumb-'+i;
+        if(i===0) img.classList.add('active');
+        img.addEventListener('click', ()=> setIndex(i));
+        thumbs.appendChild(img);
+      });
+      totalEl.textContent = images.length;
+      setIndex(0);
+      bindEvents();
+      renderMarkers();
+    }
+
+    function bindEvents(){
+      // pointer events for pan (works for touch & mouse)
+      viewer.addEventListener('pointerdown', (e)=>{
+        // ignore when clicking inside a popup or marker pin UI
+        if(e.target.closest('.popup') || e.target.closest('.pin') || e.target.closest('.nav-btn')) return;
+        isDragging = true; lastX = e.clientX; viewer.setPointerCapture(e.pointerId);
+      });
+      viewer.addEventListener('pointermove', (e)=>{
+        if(!isDragging) return; const dx = e.clientX - lastX; lastX = e.clientX; panBy(-dx);
+      });
+      viewer.addEventListener('pointerup', (e)=>{isDragging=false; try{viewer.releasePointerCapture(e.pointerId)}catch(e){} });
+      viewer.addEventListener('pointercancel', ()=>{isDragging=false});
+
+      // wheel to pan
+      viewer.addEventListener('wheel', (e)=>{ e.preventDefault(); panBy(e.deltaY); }, {passive:false});
+
+      // click to add marker when in add mode
+      viewer.addEventListener('click', (e)=>{
+        // ignore clicks on marker UI
+        if(e.target.closest('.popup') || e.target.closest('.pin') || e.target.closest('.nav-btn')) return;
+        if(!addMode) return;
+        // add marker
+        const rect = viewer.getBoundingClientRect();
+        const x = e.clientX - rect.left; const y = e.clientY - rect.top;
+        const imgX = x + offset;
+        const xPercent = (imgX / renderedWidth) * 100;
+        const yPercent = (y / rect.height) * 100;
+        const m = { id: randomId(), xPercent: clamp(xPercent,0,100), yPercent: clamp(yPercent,0,100), title:'', linkIndex: currentIndex };
+        if(!markers[currentIndex]) markers[currentIndex]=[];
+        markers[currentIndex].push(m); saveMarkers(); renderMarkers();
+      });
+
+      // toggle add
+      toggleAddBtn.addEventListener('click', ()=>{ addMode = !addMode; toggleAddBtn.textContent = addMode ? 'Adding: Click to place' : 'Add Marker'; toggleAddBtn.style.background = addMode ? 'linear-gradient(90deg,#0ea5a4,#06b6d4)' : ''; });
+
+      exportBtn.addEventListener('click', ()=>{
+        const data = JSON.stringify(markers, null, 2);
+        const blob = new Blob([data],{type:'application/json'}); const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href=url; a.download='panorama-markers.json'; a.click(); URL.revokeObjectURL(url);
+      });
+
+      importFile.addEventListener('change', (e)=>{
+        const f = e.target.files[0]; if(!f) return; const r = new FileReader(); r.onload = ()=>{ try{ const j = JSON.parse(r.result); markers = j || {}; saveMarkers(); renderMarkers(); alert('Imported markers'); }catch(err){ alert('Invalid JSON') } }; r.readAsText(f);
+      });
+
+      clearBtn.addEventListener('click', ()=>{ if(confirm('Clear all markers?')){ markers={}; saveMarkers(); renderMarkers(); } });
+
+      window.addEventListener('resize', ()=>{ computeSizes(); updateMarkerPositions(); });
+
+      // prevent image dragging
+      pimg.addEventListener('dragstart',(e)=>e.preventDefault());
+
+      // when image loads, compute sizes
+      pimg.addEventListener('load', ()=>{ computeSizes(); // ensure offset in bounds
+        offset = clamp(offset, 0, Math.max(0, renderedWidth - containerWidth)); updateTransform(); updateStats(); renderMarkers();
+      });
+
+      // nav button click & long-press behavior
+      navLeft.addEventListener('mousedown', ()=> startContinuousScroll(-1));
+      navRight.addEventListener('mousedown', ()=> startContinuousScroll(1));
+      document.addEventListener('mouseup', stopContinuousScroll);
+      navLeft.addEventListener('touchstart', (e)=>{ e.preventDefault(); startContinuousScroll(-1); });
+      navRight.addEventListener('touchstart', (e)=>{ e.preventDefault(); startContinuousScroll(1); });
+      navLeft.addEventListener('click', ()=> smoothPanBy(-scrollStepPx()));
+      navRight.addEventListener('click', ()=> smoothPanBy(scrollStepPx()));
+    }
+
+    function startContinuousScroll(direction){ // direction -1 left, 1 right
+      stopContinuousScroll();
+      // immediate small pan
+      panBy(direction * scrollStepPx());
+      // then start interval for continuous movement
+      scrollInterval = setInterval(()=> panBy(direction * Math.max(20, Math.round(containerWidth * 0.06))), 80);
+    }
+    function stopContinuousScroll(){ if(scrollInterval){ clearInterval(scrollInterval); scrollInterval = null; } }
+
+    // smooth pan animation helper
+    function smoothPanBy(delta){ const start = offset; const end = clamp(offset + delta, 0, Math.max(0, renderedWidth - containerWidth)); const duration=260; const startTime = performance.now(); function step(t){ const p = Math.min(1,(t-startTime)/duration); const ease = (1 - Math.cos(p*Math.PI))/2; offset = start + (end-start)*ease; updateTransform(); updateStats(); updateMarkerPositions(); if(p<1) requestAnimationFrame(step); } requestAnimationFrame(step); }
+
+    function setIndex(i){
+      currentIndex = i; curIdxEl.textContent = i+1;
+      // set active thumb
+      Array.from(thumbs.children).forEach((el,idx)=> el.classList.toggle('active', idx===i));
+      // change image src
+      pimg.src = images[i];
+      // small timeout to allow naturalWidth
+      setTimeout(()=> computeSizes(), 80);
+    }
+
+    function computeSizes(){
+      const rect = viewer.getBoundingClientRect(); containerWidth = rect.width; const contH = rect.height;
+      if(pimg.naturalWidth && pimg.naturalHeight){ const scale = contH / pimg.naturalHeight; renderedWidth = pimg.naturalWidth * scale; }
+      else renderedWidth = containerWidth; // fallback
+      // clamp offset
+      offset = clamp(offset, 0, Math.max(0, renderedWidth - containerWidth)); updateTransform(); updateStats();
+    }
+
+    function panBy(dx){ offset = offset + dx; const max = Math.max(0, renderedWidth - containerWidth); offset = clamp(offset, 0, max); updateTransform(); updateStats(); updateMarkerPositions(); }
+    function updateTransform(){ panorama.style.transform = 'translateX(' + (-offset) + 'px)'; }
+    function updateStats(){ const max = Math.max(1, renderedWidth - containerWidth); const pct = Math.round((offset / max) * 100); stats.textContent = pct + '%'; }
+
+    function renderMarkers(){
+      // Clear marker elements for images that changed
+      markerEls.forEach((el,id)=>{ el.remove(); }); markerEls.clear();
+
+      const list = markers[currentIndex] || [];
+      list.forEach(m=>{
+        const el = document.createElement('div'); el.className='marker'; el.dataset.id = m.id; el.style.position='absolute';
+
+        const pin = document.createElement('div'); pin.className='pin'; pin.title = m.title || '(no title)';
+        pin.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24"><path fill="#ff4d6d" d="M12 2C8.686 2 6 4.686 6 8c0 5.25 6 12 6 12s6-6.75 6-12c0-3.314-2.686-6-6-6z"/></svg>';
+        el.appendChild(pin);
+
+        // popup editor (hidden by default)
+        const popup = document.createElement('div'); popup.className='popup'; popup.style.display='none';
+        popup.innerHTML = '<input type="text" placeholder="title" class="mtitle">' +
+                          '<div class="linkimgs"></div>' +
+                          '<div style="margin-top:8px;display:flex;gap:6px"><button class="btnsave btn">Save</button><button class="btndel btn ghost">Delete</button></div>';
+        el.appendChild(popup);
+
+        // append to markers layer (so coords are inside viewer)
+        markersLayer.appendChild(el);
+        markerEls.set(m.id, el);
+
+        // fill link thumbnails inside popup
+        const linkbox = popup.querySelector('.linkimgs');
+        images.forEach((src,idx)=>{ const im = document.createElement('img'); im.src=src; im.dataset.idx = idx; if(idx===m.linkIndex) im.classList.add('sel'); im.addEventListener('click', ()=>{ m.linkIndex = idx; Array.from(linkbox.children).forEach(ch=>ch.classList.remove('sel')); im.classList.add('sel'); }); linkbox.appendChild(im); });
+
+        // pin click toggles popup
+        pin.addEventListener('click', (ev)=>{ ev.stopPropagation(); // prevent add-mode click
+          const showing = popup.style.display === 'block'; // toggle
+          // hide any other popups
+          markersLayer.querySelectorAll('.popup').forEach(p=>p.style.display='none');
+          popup.style.display = showing ? 'none' : 'block';
+          popup.querySelector('.mtitle').value = m.title || '';
+        });
+
+        // save & delete
+        popup.querySelector('.btnsave').addEventListener('click', ()=>{ m.title = popup.querySelector('.mtitle').value.trim(); saveMarkers(); updateMarkerPositions(); popup.style.display='none'; });
+        popup.querySelector('.btndel').addEventListener('click', ()=>{ markers[currentIndex] = (markers[currentIndex] || []).filter(x=>x.id!==m.id); saveMarkers(); renderMarkers(); });
+
+        // double click to open linked panorama and center
+        pin.addEventListener('dblclick', (ev)=>{ ev.stopPropagation(); const target = m.linkIndex ?? currentIndex; setIndex(target); setTimeout(()=> centerOnMarker(m, target), 160); });
+      });
+
+      // position all markers after creating
+      updateMarkerPositions();
+    }
+
+    function updateMarkerPositions(){
+      const list = markers[currentIndex] || [];
+      list.forEach(m=>{
+        const el = markerEls.get(m.id);
+        if(!el) return;
+        const leftPx = (m.xPercent/100) * renderedWidth - offset; const topPx = (m.yPercent/100) * viewer.clientHeight;
+        // hide if outside viewport slightly
+        if(leftPx < -40 || leftPx > containerWidth + 40){ el.style.display = 'none'; } else { el.style.display = 'block'; }
+        el.style.left = leftPx + 'px'; el.style.top = topPx + 'px';
+
+        // if popup is open, ensure it stays within viewer bounds horizontally
+        const popup = el.querySelector('.popup');
+        if(popup && popup.style.display === 'block'){
+          const rect = popup.getBoundingClientRect();
+          const viewerRect = viewer.getBoundingClientRect();
+          const desiredLeft = viewerRect.left + leftPx;
+          let shift = 0;
+          if(desiredLeft - rect.width/2 < viewerRect.left + 8) shift = (viewerRect.left + 8) - (desiredLeft - rect.width/2);
+          if(desiredLeft + rect.width/2 > viewerRect.right - 8) shift = (viewerRect.right - 8) - (desiredLeft + rect.width/2);
+          popup.style.transform = 'translate(calc(-50% + ' + shift + 'px), 6px)';
+        }
+      });
+    }
+
+    function centerOnMarker(marker, idx){
+      if(idx!==currentIndex) setIndex(idx);
+      const contH = viewer.clientHeight; const scale = pimg.naturalHeight ? contH / pimg.naturalHeight : 1; const rW = pimg.naturalWidth ? pimg.naturalWidth * scale : renderedWidth; renderedWidth = rW;
+      const markerX = (marker.xPercent/100) * rW; const desired = clamp(markerX - containerWidth/2, 0, Math.max(0, rW - containerWidth)); offset = desired; updateTransform(); updateStats(); updateMarkerPositions();
+    }
+
+    function saveMarkers(){ try{ localStorage.setItem(storageKey, JSON.stringify(markers)); }catch(e){ console.warn('save failed',e); } }
+    function loadMarkers(){ try{ const raw = localStorage.getItem(storageKey); return raw ? JSON.parse(raw) : {}; }catch(e){ return {}; } }
+
+    function randomId(){ return Math.random().toString(36).slice(2,9); }
+    function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+
+    // initial compute sizes
+    function computeSizesRepeated(){ computeSizes(); if(!pimg.naturalWidth){ setTimeout(computeSizesRepeated, 120); } }
+
+    init(); computeSizesRepeated();
+
+  })();
+  </script>
+</body>
+</html>

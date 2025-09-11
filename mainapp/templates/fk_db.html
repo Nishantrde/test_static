@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Supabase Upload Demo</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; }
+    label { display: block; margin-top: 10px; }
+    input, textarea { width: 100%; padding: 8px; margin-top: 5px; }
+    button { margin-top: 15px; padding: 10px 15px; }
+    .message { margin-top:15px; }
+    .error { color: red; }
+    .success { color: green; }
+    .item { border-bottom: 1px solid #ccc; padding: 8px 0; }
+  </style>
+  <!-- Load Supabase JS library from CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <h1>Upload Data to Supabase</h1>
+  
+  <label for="title">Title:</label>
+  <input type="text" id="title" />
+
+  <label for="description">Description:</label>
+  <textarea id="description" rows="4"></textarea>
+
+  <button id="saveBtn">Save</button>
+
+  <div id="message" class="message"></div>
+
+  <h2>Saved Items:</h2>
+  <div id="itemList"></div>
+
+  <script>
+    // --- CONFIG: replace with your project values ---
+    const SUPABASE_URL = "https://ftqizhvicvkrvxixklmn.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0cWl6aHZpY3ZrcnZ4aXhrbG1uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY5NzIxNTAsImV4cCI6MjA3MjU0ODE1MH0.-dLo4_VuFrhu-a72O1ZKSIzmtDrUi0IbubvQOd1gSk8";
+
+    // --- Initialize Supabase client ---
+    // Notice: It's `createClient(...)` accessed via global `supabase` object
+    const { createClient } = supabase;  // supabase is global because of the CDN script above
+    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // --- DOM elements ---
+    const titleInput = document.getElementById('title');
+    const descInput = document.getElementById('description');
+    const saveBtn = document.getElementById('saveBtn');
+    const messageDiv = document.getElementById('message');
+    const itemList = document.getElementById('itemList');
+
+    // --- Helpers ---
+    function showMessage(msg, isError = false) {
+      messageDiv.textContent = msg;
+      messageDiv.className = 'message ' + (isError ? 'error' : 'success');
+      setTimeout(() => {
+        messageDiv.textContent = '';
+      }, 4000);
+    }
+
+    function addItemToList(item) {
+      const div = document.createElement('div');
+      div.className = 'item';
+      div.innerHTML =
+        `<strong>${escapeHtml(item.title)}</strong><br>` +
+        `${escapeHtml(item.description)}<br>` +
+        `<small>${new Date(item.created_at).toLocaleString()}</small>`;
+      itemList.prepend(div);
+    }
+
+    function escapeHtml(s) {
+      return (s || '')
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    // --- Load existing items ---
+    async function loadItems() {
+      const { data, error } = await supabaseClient
+        .from('items')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (error) {
+        showMessage('Error loading items: ' + error.message, true);
+        console.error(error);
+        return;
+      }
+      data.forEach(addItemToList);
+    }
+    loadItems();
+
+    // --- Save new item on button click ---
+    saveBtn.addEventListener('click', async () => {
+      const title = titleInput.value.trim();
+      const description = descInput.value.trim();
+
+      if (!title) {
+        showMessage('Title is required', true);
+        return;
+      }
+
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving...';
+
+      const { data, error } = await supabaseClient
+        .from('items')
+        .insert([{ title, description }])
+        .select()
+        .single();
+
+      if (error) {
+        showMessage('Error saving: ' + error.message, true);
+        console.error(error);
+      } else {
+        showMessage('Saved successfully');
+        addItemToList(data);
+        titleInput.value = '';
+        descInput.value = '';
+      }
+
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save';
+    });
+  </script>
+</body>
+</html>

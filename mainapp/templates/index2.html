@@ -1,0 +1,18 @@
+<!-- myapp/templates/myapp/my_form.html -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Upload form</title>
+</head>
+<body>
+  <form method="post" action="/snd_hr" enctype="multipart/form-data">
+    {% csrf_token %}
+    <input type="text" id="field1" name="field1" placeholder="Name"><br>
+    <label for="imgInp">Choose file</label><br>
+    <input type="file" id="imgInp" name="imgINP" accept="image/*"><br><br>
+    <input type="submit" value="Submit">
+  </form>
+</body>
+</html>
