@@ -24,6 +24,6 @@
         "src": "/(.*)",
         "dest": "static_deploy/wsgi.py"
       }
-    ]
+    ],
     "outputDirectory":"static"
   }
