@@ -7,23 +7,21 @@
         "config": { "maxLambdaSize": "15mb", "runtime": "python3.9" }
       },
       {
-          "src": "static_files_builder.sh", 
-          "use": "@vercel/static-build",
-          "config": {
-            "distDir": "staticfiles" 
-          }
+        "src": "build_files.sh",
+        "use": "@vercel/static-build",
+        "config": {
+          "distDir": "staticfiles_build"
         }
-
+      }
     ],
     "routes": [
       {
-          "src": "/static/(.*)",
-          "dest": "/static/$1"
-        },
+        "src": "/static/(.*)",
+        "dest": "/static/$1"
+      },
       {
         "src": "/(.*)",
         "dest": "static_deploy/wsgi.py"
       }
-    ],
-    "outputDirectory":"static"
+    ]
   }
